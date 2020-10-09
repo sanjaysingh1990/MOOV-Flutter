@@ -1,13 +1,10 @@
 // import 'package:MOOV/widgets/segmented_control.dart';
-import 'package:MOOV/pages/home.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:MOOV/helpers/themes.dart';
+import 'package:MOOV/pages/home.dart';
+import 'package:MOOV/widgets/moov_item.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
-import 'package:MOOV/pages/MoovMaker.dart';
-import 'package:MOOV/models/post_model.dart';
-import 'package:MOOV/services/database.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 
 class MOOVSPage extends StatefulWidget {
   @override
@@ -17,6 +14,7 @@ class MOOVSPage extends StatefulWidget {
 class _MOOVSPageState extends State<MOOVSPage> {
   final String currentUserId = currentUser?.id;
   bool isLiked = false;
+
   @override
   Widget build(BuildContext context) {
     isLiked = false;
@@ -67,110 +65,14 @@ class _MOOVSPageState extends State<MOOVSPage> {
       ),
 
       body: StreamBuilder(
-          stream: Firestore.instance
-              .collection('food')
-              .orderBy("startDate")
-              .snapshots(),
+          stream: Firestore.instance.collection('food').orderBy("startDate").snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) return Text('Loading data...');
             return ListView.builder(
               itemCount: snapshot.data.documents.length,
               itemBuilder: (context, index) {
                 DocumentSnapshot course = snapshot.data.documents[index];
-                return Card(
-                  color: Colors.white,
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    children: [
-                      ListTile(
-                        title: Row(children: <Widget>[
-                          Expanded(
-                              child: Padding(
-                                  padding: const EdgeInsets.all(5.0),
-                                  child: Container(
-                                      decoration: BoxDecoration(
-                                          border: Border.all(
-                                        color: Color(0xff000000),
-                                        width: 1,
-                                      )),
-                                      child: Image.asset('lib/assets/chens.jpg',
-                                          fit: BoxFit.cover,
-                                          height: 130,
-                                          width: 50)))),
-                          Expanded(
-                              child: Column(children: <Widget>[
-                            Padding(padding: const EdgeInsets.all(8.0)),
-                            Padding(
-                                padding: const EdgeInsets.all(2.0),
-                                child: Text(course['title'].toString(),
-                                    style: TextStyle(
-                                        color: Colors.blue[900],
-                                        fontSize: 20.0,
-                                        fontWeight: FontWeight.bold),
-                                    textAlign: TextAlign.center)),
-                            Padding(
-                              padding: const EdgeInsets.all(10.0),
-                              child: Text(
-                                course['description'].toString(),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 12.0,
-                                    color: Colors.black.withOpacity(0.6)),
-                              ),
-                            ),
-                            Padding(padding: const EdgeInsets.all(5.0)),
-                            Padding(
-                                padding: const EdgeInsets.all(3.0),
-                                child: Align(
-                                  alignment: Alignment.bottomRight,
-                                  child: Text(
-                                      DateFormat('EEEE, MMM d, yyyy')
-                                          .format(course['startDate'].toDate()),
-                                      style: TextStyle(
-                                          fontSize: 12.0,
-                                          fontWeight: FontWeight.bold)),
-                                )),
-                          ]))
-                        ]),
-                      ),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 1.0),
-                        child: Container(
-                          height: 1.0,
-                          width: 500.0,
-                          color: Colors.grey[300],
-                        ),
-                      ),
-                      ButtonBar(
-                        alignment: MainAxisAlignment.end,
-                        children: [
-                          FlatButton(
-                            textColor: const Color(0xFF6200EE),
-                            onPressed: () {
-                              // Perform some action
-                            },
-                            child: Padding(
-                                padding: const EdgeInsets.all(2.0),
-                                child: Text("WHO'S GOING?",
-                                    style: TextStyle(
-                                        color: Colors.blue[500],
-                                        fontSize: 15.0,
-                                        fontWeight: FontWeight.bold),
-                                    textAlign: TextAlign.left)),
-                          ),
-                          GestureDetector(
-                              onTap: handleLikePost(),
-                              child: Icon(
-                                  isLiked
-                                      ? Icons.favorite
-                                      : Icons.favorite_border,
-                                  size: 28.0,
-                                  color: Colors.pink))
-                        ],
-                      ),
-                    ],
-                  ),
-                );
+                return MoovItem(course: course);
               },
             );
           }),
@@ -183,13 +85,5 @@ class _MOOVSPageState extends State<MOOVSPage> {
       //     icon: Icon(Icons.search, color: Colors.white),
       //     backgroundColor: Color.fromRGBO(220, 180, 57, 1.0))
     );
-  }
-
-  handleLikePost() {
-    if (isLiked == true) {
-      isLiked = false;
-    } else {
-      isLiked = true;
-    }
   }
 }

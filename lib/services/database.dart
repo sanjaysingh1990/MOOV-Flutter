@@ -1,5 +1,7 @@
 // import 'package:flutter/material.dart';
 // import 'package:MOOV/pages/HomePage.dart';
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Database {
@@ -35,9 +37,7 @@ class Database {
     // final String postId = ref.documentID;
     print(ref.documentID);
 
-    Firestore.instance
-        .collection("food")
-        .orderBy("startDate", descending: true);
+    Firestore.instance.collection("food").orderBy("startDate", descending: true);
   }
 
   // void createSportPost(
@@ -80,10 +80,7 @@ class Database {
 
   void updateData() {
     try {
-      dbRef
-          .collection('books')
-          .document('1')
-          .updateData({'description': 'Head First Flutter'});
+      dbRef.collection('books').document('1').updateData({'description': 'Head First Flutter'});
     } catch (e) {
       print(e.toString());
     }
@@ -95,5 +92,56 @@ class Database {
     } catch (e) {
       print(e.toString());
     }
+  }
+
+  Future<void> addLike(String uid, String moovId) async {
+    return dbRef.runTransaction((transaction) async {
+      final int index = Random().nextInt(10);
+      final DocumentReference ref = dbRef.document('food/$moovId/likes/shred-$index');
+      final DocumentSnapshot snapshot = await transaction.get(ref);
+
+      if (!snapshot.exists) {
+        transaction.set(ref, {'counter': 1});
+      } else {
+        transaction.update(ref, {'counter': FieldValue.increment(1)});
+      }
+
+      final DocumentReference userRef = dbRef.document('users/$uid');
+      transaction.update(userRef, {
+        'liked': FieldValue.arrayUnion([moovId])
+      });
+    });
+  }
+
+  Future<void> removeLike(String uid, String moovId) async {
+    return dbRef.runTransaction((transaction) async {
+      final Random random = Random();
+
+      // todo: remember all the values that were used son we don't use them again
+      int index = random.nextInt(10);
+      DocumentSnapshot snapshot;
+      while (snapshot == null) {
+        final DocumentReference ref = dbRef.document('food/$moovId/likes/shred-$index');
+        snapshot = await transaction.get(ref);
+
+        if (!snapshot.exists) {
+          index = random.nextInt(10);
+          snapshot = null;
+        }
+      }
+
+      transaction.update(snapshot.reference, {'counter': FieldValue.increment(-1)});
+      final DocumentReference userRef = dbRef.document('users/$uid');
+      transaction.update(userRef, {
+        'liked': FieldValue.arrayRemove([moovId])
+      });
+    });
+  }
+
+  Stream<int> likesForMoov(String moovId) {
+    return dbRef
+        .collection('food/$moovId/likes')
+        .snapshots()
+        .map((snapshot) => snapshot.documents.fold(0, (sum, item) => sum + item['counter']));
   }
 }

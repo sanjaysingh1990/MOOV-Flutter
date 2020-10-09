@@ -1,15 +1,16 @@
+import 'dart:async';
+
 import 'package:MOOV/helpers/themes.dart';
 import 'package:MOOV/models/user.dart';
 import 'package:MOOV/pages/HomePage.dart';
 import 'package:MOOV/pages/MOOVSPage.dart';
 import 'package:MOOV/pages/ProfilePage.dart';
-// import 'package:MOOV/pages/upload.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-// import 'package:MOOV/pages/FoodFeed.dart';
+
 import 'create_account.dart';
 
 final GoogleSignIn googleSignIn = GoogleSignIn();
@@ -25,6 +26,7 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  StreamSubscription<DocumentSnapshot> sub;
   bool isAuth = false;
   PageController pageController;
   int pageIndex = 0;
@@ -63,30 +65,35 @@ class _HomeState extends State<Home> {
   createUserInFirestore() async {
     // 1) check if user exists in users collection in database (according to their id)
     final GoogleSignInAccount user = googleSignIn.currentUser;
-    DocumentSnapshot doc = await usersRef.document(user.id).get();
+    sub = usersRef.document(user.id).snapshots().listen((doc) async {
+      if (!doc.exists) {
+        // 2) if the user doesn't exist, then we want to take them to the create account page
+        final username = await Navigator.push(context, MaterialPageRoute(builder: (context) => CreateAccount()));
 
-    if (!doc.exists) {
-      // 2) if the user doesn't exist, then we want to take them to the create account page
-      final username = await Navigator.push(
-          context, MaterialPageRoute(builder: (context) => CreateAccount()));
+        // 3) get username from create account, use it to make new user document in users collection
+        usersRef.document(user.id).setData({
+          "id": user.id,
+          "username": username,
+          "photoUrl": user.photoUrl,
+          "email": user.email,
+          "displayName": user.displayName,
+          "bio": "",
+          "timestamp": timestamp
+        });
+        doc = await usersRef.document(user.id).get();
+      }
 
-      // 3) get username from create account, use it to make new user document in users collection
-      usersRef.document(user.id).setData({
-        "id": user.id,
-        "username": username,
-        "photoUrl": user.photoUrl,
-        "email": user.email,
-        "displayName": user.displayName,
-        "bio": "",
-        "timestamp": timestamp
+      setState(() {
+        if (mounted) {
+          currentUser = User.fromDocument(doc);
+        }
       });
-      doc = await usersRef.document(user.id).get();
-    }
-    currentUser = User.fromDocument(doc);
+    });
   }
 
   @override
   void dispose() {
+    sub?.cancel();
     pageController.dispose();
     super.dispose();
   }
@@ -113,31 +120,28 @@ class _HomeState extends State<Home> {
     );
   }
 
-  Scaffold buildAuthScreen() {
+  Widget buildAuthScreen() {
     // Upload(currentUser: currentUser);
-    return Scaffold(
-      body: PageView(
-        children: <Widget>[
-          // Timeline(),
-          HomePage(),
-          MOOVSPage(),
-          ProfilePage()
-        ],
-        controller: pageController,
-        onPageChanged: onPageChanged,
+    return CurrentUserWidget(
+      user: currentUser,
+      child: Scaffold(
+        body: PageView(
+          children: <Widget>[
+            // Timeline(),
+            HomePage(),
+            MOOVSPage(),
+            ProfilePage()
+          ],
+          controller: pageController,
+          onPageChanged: onPageChanged,
+        ),
+        bottomNavigationBar:
+            CupertinoTabBar(currentIndex: pageIndex, onTap: onTap, activeColor: Theme.of(context).primaryColor, items: [
+          BottomNavigationBarItem(title: Text("Home"), icon: Icon(Icons.home)),
+          BottomNavigationBarItem(title: Text("My MOOVs"), icon: Icon(Icons.directions_run)),
+          BottomNavigationBarItem(title: Text("Profile"), icon: Icon(Icons.account_circle)),
+        ]),
       ),
-      bottomNavigationBar: CupertinoTabBar(
-          currentIndex: pageIndex,
-          onTap: onTap,
-          activeColor: Theme.of(context).primaryColor,
-          items: [
-            BottomNavigationBarItem(
-                title: Text("Home"), icon: Icon(Icons.home)),
-            BottomNavigationBarItem(
-                title: Text("My MOOVs"), icon: Icon(Icons.directions_run)),
-            BottomNavigationBarItem(
-                title: Text("Profile"), icon: Icon(Icons.account_circle)),
-          ]),
     );
     // return RaisedButton(
     //   child: Text('Logout'),
@@ -182,5 +186,26 @@ class _HomeState extends State<Home> {
   @override
   Widget build(BuildContext context) {
     return isAuth ? buildAuthScreen() : buildUnAuthScreen();
+  }
+}
+
+class CurrentUserWidget extends InheritedWidget {
+  const CurrentUserWidget({
+    Key key,
+    @required Widget child,
+    @required this.user,
+  })  : assert(child != null),
+        super(key: key, child: child);
+
+  final User user;
+
+  static User of(BuildContext context) {
+    final CurrentUserWidget widget = context.dependOnInheritedWidgetOfExactType<CurrentUserWidget>();
+    return widget.user;
+  }
+
+  @override
+  bool updateShouldNotify(CurrentUserWidget oldWidget) {
+    return user != oldWidget.user;
   }
 }
